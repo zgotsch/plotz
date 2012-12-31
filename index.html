@@ -1,8 +1,10 @@
 <html>
 <head>
     <title>Testing plotz</title>
-    <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js"></script>
-    <script src="http://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.4.2/underscore-min.js"></script>
+    <!--<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js"></script>
+    <script src="http://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.4.2/underscore-min.js"></script>-->
+    <script src="jquery.min.js"></script>
+    <script src="underscore-min.js"></script>
     <script src="main.js"></script>
     <style type="text/css">
         canvas {
@@ -15,5 +17,13 @@
     <h1>It's working!</h1>
     <canvas id="paper" width="400" height="300"></canvas>
     <input type="range" id="pow" min="0" max="10" value="2" step="1">
+    <label>Min x</label>
+    <input id="min-x-input" type="text" value="-2">
+    <label>Max x</label>
+    <input id="max-x-input" type="text" value="2">
+    <label>Min y</label>
+    <input id="min-y-input" type="text" value="-8">
+    <label>Max y</label>
+    <input id="max-y-input" type="text" value="8">
 </body>
 </html>

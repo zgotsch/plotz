@@ -3,23 +3,37 @@
   var __bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; };
 
   $(function() {
-    var Plotter, f;
+    var Plotter, f, get_val, reset_window;
     Plotter = (function() {
 
       function Plotter($canvas) {
+        this.mouse_move = __bind(this.mouse_move, this);
+
+        this.mouse_up = __bind(this.mouse_up, this);
+
+        this.mouse_down = __bind(this.mouse_down, this);
+
+        this._screen_scale_to_xy = __bind(this._screen_scale_to_xy, this);
+
+        this._screen_to_xy = __bind(this._screen_to_xy, this);
+
         this._xy_to_screen = __bind(this._xy_to_screen, this);
         this.width = parseInt($canvas.attr('width'));
         this.height = parseInt($canvas.attr('height'));
-        this.ctx = $canvas[0].getContext('2d');
+        this.$canvas = $canvas;
+        this.ctx = this.$canvas[0].getContext('2d');
+        this.$canvas.mousedown(this.mouse_down);
+        this.current_function = null;
       }
 
       Plotter.prototype.set_window = function(min_x, max_x, min_y, max_y) {
-        return this.window = {
+        this.window = {
           min: [min_x, min_y],
           max: [max_x, max_y],
           width: max_x - min_x,
           height: max_y - min_y
         };
+        return this.redraw();
       };
 
       Plotter.prototype._xy_to_screen = function(_arg) {
@@ -28,6 +42,50 @@
         u = (x - this.window.min[0]) * this.width / this.window.width;
         v = (this.window.max[1] - y) * this.height / this.window.height;
         return [u, v];
+      };
+
+      Plotter.prototype._screen_to_xy = function(_arg) {
+        var u, v, x, y;
+        u = _arg[0], v = _arg[1];
+        x = (u * this.window.width / this.width) + this.window.min[0];
+        y = this.window.max[1] - (v * this.window.height / this.height);
+        return [x, y];
+      };
+
+      Plotter.prototype._screen_scale_to_xy = function(_arg) {
+        var u, v, x, y;
+        u = _arg[0], v = _arg[1];
+        x = u * this.window.width / this.width;
+        y = v * this.window.height / this.height;
+        return [x, y];
+      };
+
+      Plotter.prototype.mouse_down = function(event) {
+        var offsetX, offsetY;
+        offsetX = event.offsetX, offsetY = event.offsetY;
+        event.preventDefault();
+        this.old_mouse_position = [offsetX, offsetY];
+        this.$canvas.mousemove(this.mouse_move);
+        return this.$canvas.mouseup(this.mouse_up);
+      };
+
+      Plotter.prototype.mouse_up = function() {
+        this.old_mouse_position = null;
+        return this.$canvas.unbind('mousemove', this.mouse_move);
+      };
+
+      Plotter.prototype.mouse_move = function(_arg) {
+        var delta, offsetX, offsetY;
+        offsetX = _arg.offsetX, offsetY = _arg.offsetY;
+        delta = this._minus([offsetX, offsetY], this.old_mouse_position);
+        delta[0] = -delta[0];
+        console.log("delta: " + delta);
+        delta = this._screen_scale_to_xy(delta);
+        console.log(delta);
+        this.window.min = this._plus(this.window.min, delta);
+        this.window.max = this._plus(this.window.max, delta);
+        this.old_mouse_position = [offsetX, offsetY];
+        return this.redraw();
       };
 
       Plotter.grain = 50;
@@ -65,6 +123,7 @@
 
       Plotter.prototype.plot = function(f) {
         var indices, screen_points, values;
+        this.current_function = f;
         indices = this._make_indices();
         values = _(indices).map(f);
         screen_points = _.map(_.zip(indices, values), this._xy_to_screen);
@@ -73,8 +132,18 @@
         return this._plot_points(screen_points);
       };
 
+      Plotter.prototype.redraw = function() {
+        if (this.current_function != null) {
+          return this.plot(this.current_function);
+        }
+      };
+
       Plotter.prototype._plus = function(p1, p2) {
         return [p1[0] + p2[0], p1[1] + p2[1]];
+      };
+
+      Plotter.prototype._minus = function(p1, p2) {
+        return [p1[0] - p2[0], p1[1] - p2[1]];
       };
 
       Plotter.min = 1;
@@ -82,7 +151,7 @@
       Plotter.tick_width = 4;
 
       Plotter.prototype._draw_axes = function() {
-        var delta, point, x, y, _i, _j, _len, _len1, _ref, _ref1;
+        var delta, lower_points, point, points, upper_points, x, y, _i, _j, _len, _len1;
         this.ctx.strokeStyle = "#000";
         if ((this.window.min[0] <= 0 && 0 <= this.window.max[0])) {
           this.ctx.beginPath();
@@ -91,9 +160,11 @@
           this.ctx.stroke();
           delta = Math.ceil(this.window.width / 10);
           this.ctx.beginPath();
-          _ref = (_.range(0, this.window.max[1], delta)).concat(_.range(this.window.min[1], 0, delta));
-          for (_i = 0, _len = _ref.length; _i < _len; _i++) {
-            y = _ref[_i];
+          upper_points = _.range(0, this.window.max[1], delta);
+          lower_points = _.range(0, this.window.min[1], -delta);
+          points = _.union(upper_points, lower_points);
+          for (_i = 0, _len = points.length; _i < _len; _i++) {
+            y = points[_i];
             point = this._xy_to_screen([0, y]);
             this._move_to(this._plus(point, [-Plotter.tick_width, 0]));
             this._line_to(this._plus(point, [Plotter.tick_width, 0]));
@@ -107,9 +178,11 @@
           this.ctx.stroke();
           delta = Math.ceil(this.window.width / 10);
           this.ctx.beginPath();
-          _ref1 = (_.range(0, this.window.max[0], delta)).concat(_.range(this.window.min[0], 0, delta));
-          for (_j = 0, _len1 = _ref1.length; _j < _len1; _j++) {
-            x = _ref1[_j];
+          upper_points = _.range(0, this.window.max[0], delta);
+          lower_points = _.range(0, this.window.min[0], -delta);
+          points = _.union(upper_points, lower_points);
+          for (_j = 0, _len1 = points.length; _j < _len1; _j++) {
+            x = points[_j];
             point = this._xy_to_screen([x, 0]);
             this._move_to(this._plus(point, [0, -Plotter.tick_width]));
             this._line_to(this._plus(point, [0, Plotter.tick_width]));
@@ -122,10 +195,17 @@
 
     })();
     window.plotter = new Plotter($('#paper'));
-    plotter.set_window(-2, 2, -8, 8);
     f = function(x) {
       return Math.pow(x, $('#pow').val());
     };
+    get_val = function(id) {
+      return parseFloat($("#" + id).val());
+    };
+    reset_window = function() {
+      return plotter.set_window(get_val('min-x-input'), get_val('max-x-input'), get_val('min-y-input'), get_val('max-y-input'));
+    };
+    $('input[type=text]').change(reset_window);
+    reset_window();
     plotter.plot(f);
     return $('#pow').change(function() {
       return plotter.plot(f);
